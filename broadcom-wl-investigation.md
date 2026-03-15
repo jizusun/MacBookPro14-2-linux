@@ -145,6 +145,16 @@ policy local to this repo. Its hardware probe also follows Omarchy's
 match. It should be treated as cleanup and verification support, not as a
 complete fix by itself.
 
+## All available solution paths
+
+For a full side-by-side comparison of every known fix (including
+`wireless-regdb`, `brcmfmac` kernel parameter, proprietary `wl`, and
+txpower workaround) with step-by-step instructions and tradeoffs, see:
+
+- [`wireless-solutions.md`](./wireless-solutions.md)
+
+The summary below focuses on the `wl`-specific investigation path only.
+
 ## Recommended next steps
 
 First capture the current failed boot cleanly:

@@ -139,7 +139,20 @@ This machine currently reports:
 - Memory: `15 GiB`
 - Wireless adapter: `Broadcom BCM43602`
 
-### 5. Test the Broadcom proprietary package path
+### 5. Test available wireless solutions
+
+For a full list of known solutions for the BCM43602 (`14e4:43ba`) adapter
+— including the `wireless-regdb` regulatory domain fix, the `brcmfmac`
+kernel parameter, the proprietary `wl` path, and the txpower workaround —
+see:
+
+- [`wireless-solutions.md`](./wireless-solutions.md)
+
+The recommended starting order for this machine is:
+1. `wireless-regdb` + `iw reg set <COUNTRY>` (Solution 2 in that doc)
+2. `brcmfmac.feature_disable=0x82000` kernel parameter (Solution 1)
+3. `broadcom-wl` + NetworkManager (Solution 3) — currently blocked by a
+   `wl` kernel initialization failure on kernel `6.19.6-arch1-1`
 
 If the proprietary `wl` path is being tested on this system, use the repo
 helper instead of manually reproducing the Omarchy package commands:
