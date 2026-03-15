@@ -1,6 +1,6 @@
 # MacBookPro14,2-linux
 
-This repository is for my `MacBookPro14,2` running Arch Linux.
+This repository is for my `MacBookPro14,2` running Omarchy.
 
 ## Machine
 
@@ -9,13 +9,13 @@ This repository is for my `MacBookPro14,2` running Arch Linux.
 - Vendor: `Apple Inc.`
 - Board ID: `Mac-CAD6701F7CEA0921`
 
-## Current Linux snapshot
+## Current system snapshot
 
-- Distribution: `Arch Linux`
+- Distribution: `Omarchy`
 - Kernel: `6.19.6-arch1-1`
 - CPU: `Intel Core i7-7567U`
 - Memory: `15 GiB`
 
 ## Purpose
 
-This repo is a simple place to keep notes, configuration, and machine-specific setup related to this MacBook on Linux.
+This repo is a simple place to keep notes, configuration, and machine-specific setup related to this MacBook running Omarchy.
