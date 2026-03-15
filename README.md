@@ -26,6 +26,8 @@ This repo is a simple place to keep notes, configuration, and machine-specific s
 - [`wireless-solutions.md`](./wireless-solutions.md) — all known solutions for the BCM43602 (`14e4:43ba`) wireless adapter, with weights, tradeoffs, and step-by-step instructions
 - [`broadcom-wl-investigation.md`](./broadcom-wl-investigation.md) — investigation log for the BCM43602 proprietary `wl` driver failure
 - [`mihomo-setup.md`](./mihomo-setup.md) — notes on the user-local `mihomo` proxy installation and verification
+- [`lid-sleep-battery.md`](./lid-sleep-battery.md) — solutions for lid-close wake failure and excessive battery drain (s2idle + NVMe fix)
+- [`usb-adapter-hotplug.md`](./usb-adapter-hotplug.md) — solutions for USB/Thunderbolt Ethernet adapter not re-recognized after unplug/replug
 
 ## Scripts
 
