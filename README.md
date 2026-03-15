@@ -24,6 +24,7 @@ This repo is a simple place to keep notes, configuration, and machine-specific s
 
 - [`omarchy-setup.md`](./omarchy-setup.md) — current Omarchy, hardware, and wireless setup notes for this machine
 - [`broadcom-wl-investigation.md`](./broadcom-wl-investigation.md) — investigation log for the BCM43602 proprietary `wl` driver failure
+- [`mihomo-setup.md`](./mihomo-setup.md) — notes on the user-local `mihomo` proxy installation and verification
 
 ## Scripts
 

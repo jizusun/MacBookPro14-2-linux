@@ -25,7 +25,7 @@ require_commands() {
   local missing=()
   local command
 
-  for command in pacman lspci depmod modprobe; do
+  for command in pacman lspci depmod modprobe mkinitcpio iw; do
     if ! command -v "${command}" >/dev/null 2>&1; then
       missing+=("${command}")
     fi
@@ -58,6 +58,10 @@ replace_package() {
     log "Stock broadcom-wl package is not installed"
   fi
 
+  if pacman -Q broadcom-wl-dkms >/dev/null 2>&1; then
+    log "broadcom-wl-dkms is already installed"
+  fi
+
   log "Installing broadcom-wl-dkms, dkms, and linux-headers"
   pacman -S --needed --noconfirm broadcom-wl-dkms dkms linux-headers
 }
@@ -86,14 +90,34 @@ refresh_modules() {
   depmod -a
 }
 
+rebuild_initramfs() {
+  log "Rebuilding initramfs so the next boot sees the updated Broadcom module policy"
+  mkinitcpio -P
+}
+
 try_live_reload() {
+  local module
+
   log "Trying a live wl reload (safe to ignore if it still fails before reboot)"
-  modprobe -r wl >/dev/null 2>&1 || true
+
+  for module in brcmfmac brcmutil brcmsmac bcma ssb b43 b43legacy wl; do
+    if lsmod | awk '{print $1}' | grep -qx "${module}"; then
+      log "Unloading ${module}"
+      modprobe -r "${module}"
+    fi
+  done
 
   if modprobe wl >/dev/null 2>&1; then
     log "wl module loaded"
   else
     log "wl still does not load cleanly in the current boot"
+    return
+  fi
+
+  if iw dev | grep -q '^Interface '; then
+    log "A wireless interface is visible in the current boot"
+  else
+    log "No wireless interface is visible yet"
   fi
 }
 
@@ -102,17 +126,30 @@ print_summary() {
 
 Done.
 
+This script gets the system onto the Arch DKMS-backed `wl` setup, writes the
+Broadcom blacklist policy, refreshes module metadata, and rebuilds the
+initramfs for the next boot. That cleanup is useful, but it is not a guarantee
+that BCM43602 will successfully initialize with `wl` on the current kernel.
+
 Next steps:
 1. Reboot the machine.
-2. After reboot, verify the Broadcom card is using wl:
+2. After reboot, verify package and DKMS state:
+     pacman -Q broadcom-wl-dkms dkms linux-headers
+     dkms status
+3. Verify whether the Broadcom card is actually using wl:
      lspci -k -s 02:00.0
-3. Check for a wireless interface:
+4. Check for a wireless interface:
      iw dev
-4. Check NetworkManager or iwd device status:
+5. Check NetworkManager or iwd device status:
      nmcli device status
 
-If wl still fails after reboot, capture:
-  journalctl -k -b --no-pager | grep -Ei 'wl|brcm|cfg80211'
+If `iw dev` is still empty or `lspci -k` still does not show
+`Kernel driver in use: wl`, capture:
+  sudo journalctl -k -b --no-pager | grep -Ei 'wl|brcm|cfg80211|firmware'
+
+If that still shows `wl` failing, the next likely path for BCM43602 (`14e4:43ba`)
+is to stop iterating the `wl` reinstall path and test the ArchWiki fallback:
+  brcmfmac.feature_disable=0x82000
 EOF
 }
 
@@ -124,6 +161,7 @@ main() {
   replace_package
   write_blacklist_file
   refresh_modules
+  rebuild_initramfs
   try_live_reload
   print_summary
 }

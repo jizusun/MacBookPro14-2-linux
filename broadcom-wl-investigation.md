@@ -7,72 +7,64 @@ adapter on this `MacBookPro14,2`, the local evidence gathered on
 ## Problem statement
 
 The machine contains a `Broadcom BCM43602 802.11ac Wireless LAN SoC`
-(`14e4:43ba`). The goal is to use the proprietary `wl` driver, but the
-currently installed non-DKMS `broadcom-wl` package does not bring up a wireless
-interface on the running kernel.
+(`14e4:43ba`). The preferred goal was to use the proprietary `wl` driver.
+That led to replacing the stock `broadcom-wl` package with
+`broadcom-wl-dkms` and rebooting.
+
+After that cleanup, Wi-Fi is still not up:
+
+- `broadcom-wl-dkms` is installed
+- `wl` is loaded
+- `iw dev` is empty
+- the Broadcom PCI function still does not show a working wireless interface
 
 Symptoms observed during investigation:
 
 - the Broadcom PCI device is present
-- the `wl` kernel module loads, then aborts during initialization
+- the `wl` kernel module loads, but no Wi-Fi interface appears
 - no Wi-Fi interface is created
 - the only active non-loopback network interface is a separate USB/Thunderbolt
   Ethernet adapter, `enp6s0u2`
 
 ## Local investigation summary
 
-### Hardware and interface state
+### Current post-reboot hardware and interface state
 
 Current live checks showed:
 
 ```bash
-ip -brief link
-lspci -nnk | sed -n '/Network controller\\|Wireless\\|Ethernet controller/,+4p'
+lspci -k -s 02:00.0
+iw dev
+lsmod | grep -E '^(wl|brcmfmac|brcmutil|cfg80211|bcma|ssb)\b'
 ls -1 /sys/class/net
 ```
 
 Observed state:
 
-- `lo` exists as expected
-- `enp6s0u2` is up and active
-- no `wlan0` or other Wi-Fi interface is present
 - the internal wireless hardware is `Broadcom BCM43602 802.11ac Wireless LAN SoC [14e4:43ba]`
-
-### Driver and module state
-
-Relevant checks:
-
-```bash
-lspci -nnk -d 14e4:43ba
-lsmod | grep -E '^(wl|brcmfmac|brcmutil|cfg80211|bcma|ssb)\\b'
-iw dev
-rfkill list
-```
-
-Observed state:
-
-- `rfkill` showed no Wi-Fi block
 - `iw dev` showed no wireless interface
 - `wl` was loaded
 - `cfg80211` was loaded
-- the device had no active bound driver shown by `lspci -k`
+- `lspci -k -s 02:00.0` still did not report an active `Kernel driver in use`
+- only `lo` and `enp6s0u2` were present under `/sys/class/net`
 
 ### Package and blacklist state
 
 Relevant checks:
 
 ```bash
-pacman -Q broadcom-wl linux linux-headers
+pacman -Q broadcom-wl-dkms dkms linux linux-headers
+dkms status
 sed -n '1,120p' /usr/lib/modprobe.d/broadcom-wl.conf
-modinfo wl | sed -n '1,120p'
+test -f /etc/modprobe.d/broadcom-wl-bcm43602.conf
 ```
 
 Observed state:
 
-- installed package: `broadcom-wl 6.30.223.271-679`
+- installed package: `broadcom-wl-dkms 6.30.223.271-47`
+- `dkms status` reported `broadcom-wl/6.30.223.271, 6.19.6-arch1-1, x86_64: installed`
 - running kernel: `6.19.6-arch1-1`
-- `wl` module file: `/lib/modules/6.19.6-arch1-1/extramodules/wl.ko.zst`
-- standard `broadcom-wl` blacklist file was already present and blacklisting:
+- the package-provided `/usr/lib/modprobe.d/broadcom-wl.conf` was present and blacklisting:
   - `b43`
   - `b43legacy`
   - `bcm43xx`
@@ -81,12 +73,14 @@ Observed state:
   - `brcmfmac`
   - `brcmsmac`
   - `ssb`
+- no user-owned `/etc/modprobe.d/broadcom-wl-bcm43602.conf` was present after reboot
 
-This means the failure is not explained by missing blacklist entries alone.
+This means the DKMS conversion happened, but it still did not result in a usable
+wireless interface.
 
-### Kernel log evidence
+### Earlier kernel log evidence
 
-The most important evidence came from the kernel journal:
+The most important earlier evidence came from the kernel journal:
 
 ```bash
 journalctl -k -b --no-pager | grep -Ei 'brcm|wl|cfg80211|wlan|firmware'
@@ -107,33 +101,35 @@ This is the strongest sign that the current failure is not just a missing
 userspace configuration. The proprietary module is being loaded but is then
 aborting very early in initialization on the current kernel.
 
-### Other checks that ruled things out
+### Matching external report
 
-- `sudo -n true` failed because an interactive password is required, so no live
-  privileged remediation was applied during the investigation session itself
-- no `facetimehd` / `bcwc_pcie` webcam module conflict was detected in the
-  current boot
-- the USB Ethernet adapter `enp6s0u2` was confirmed to be separate from the
-  internal Broadcom Wi-Fi card
-- `pacman.log` showed `broadcom-wl` was installed during the current day, so a
-  clean reboot is still required after any package-level fix
+The same failure signature was reported in `ublue-os/main#244`, also on a
+`BCM43602`, with:
+
+```text
+wl driver 6.30.223.271 (r587334) failed with code 1
+ERROR @wl_cfg80211_detach :
+NULL ndev->ieee80211ptr, unable to deref wl
+```
+
+That issue is a useful reminder that getting `wl` onto the system is not the
+same as getting a working interface from it.
 
 ## Conclusion from the investigation
 
 The current problem is best described as:
 
-> The BCM43602 hardware is present, the proprietary `wl` module is installed,
-> but the stock non-DKMS `broadcom-wl` package fails to initialize cleanly on
-> the running kernel, leaving the Broadcom device unbound and no Wi-Fi
-> interface exposed.
+> The BCM43602 hardware is present, `broadcom-wl-dkms` is installed, and the
+> `wl` module loads, but the device still exposes no wireless interface after a
+> reboot.
 
-Based on the collected evidence, the most practical `wl`-preserving next step
-is:
+The earlier `broadcom-wl` to `broadcom-wl-dkms` conversion was a reasonable
+cleanup step, but it was not sufficient. Based on the collected evidence, the
+most practical next step is now:
 
-1. replace `broadcom-wl` with `broadcom-wl-dkms`
-2. keep an explicit BCM43602 blacklist file in `/etc/modprobe.d/`
-3. reboot
-4. verify whether `wl` binds cleanly on the next boot
+1. capture privileged post-reboot kernel logs for the current failed boot
+2. if `wl` still is not binding cleanly, stop iterating the `wl` reinstall path
+3. test the ArchWiki BCM43602 fallback with `brcmfmac.feature_disable=0x82000`
 
 This is why the repo now includes:
 
@@ -141,21 +137,27 @@ This is why the repo now includes:
 sudo ./repair-broadcom-wl.sh
 ```
 
+The helper script is still useful for getting onto the Arch DKMS-backed `wl`
+setup and rebuilding initramfs cleanly, but it should now be treated as cleanup
+and verification support, not as a complete fix by itself.
+
 ## Recommended next steps
 
-Run:
+First capture the current failed boot cleanly:
 
 ```bash
-sudo ./repair-broadcom-wl.sh
-```
-
-Then reboot and verify:
-
-```bash
-lspci -k -s 02:00.0
+sudo journalctl -k -b --no-pager | grep -Ei 'wl|brcm|cfg80211|firmware'
+sudo lspci -k -s 02:00.0
 iw dev
 nmcli device status
-journalctl -k -b --no-pager | grep -Ei 'wl|brcm|cfg80211'
+```
+
+If `iw dev` is still empty and `lspci -k` still does not show
+`Kernel driver in use: wl`, the next path worth testing is the ArchWiki one for
+`14e4:43ba`:
+
+```bash
+brcmfmac.feature_disable=0x82000
 ```
 
 ## Detailed references
@@ -165,33 +167,33 @@ journalctl -k -b --no-pager | grep -Ei 'wl|brcm|cfg80211'
 1. ArchWiki, **Broadcom wireless**
    - https://wiki.archlinux.org/title/Broadcom_wireless
    - Relevant points:
-     - `BCM43602` is explicitly called out
-     - the page documents the `brcmfmac.feature_disable=0x82000` path for
-       `14e4:43ba`
-     - it also documents both `broadcom-wl` and `broadcom-wl-dkms`
-     - it notes that a reboot or reinstall may be needed after kernel updates
+      - `BCM43602` is explicitly called out
+      - the page documents the `brcmfmac.feature_disable=0x82000` path for
+        `14e4:43ba`
+      - it also documents both `broadcom-wl` and `broadcom-wl-dkms`
+      - it recommends checking the in-kernel `brcm80211` path before resorting
+        to other drivers
 
 2. Omarchy issue **2016 MacBook Pro bizarre WiFi behavior**
    - https://github.com/basecamp/omarchy/issues/1022
    - Why it matters:
-     - multiple Apple/Broadcom users discussed `14e4:43a0` and `14e4:43ba`
-     - the issue thread moved from `brcmfmac.feature_disable=0x82000` toward
-       reports that `broadcom-wl` was still required for some machines
+      - it collected reports from Apple/Broadcom users on recent Omarchy/Arch
+        installs
+      - it is the upstream issue linked from later Omarchy Broadcom work
 
 3. Omarchy pull request **DRAFT: Fix Broadcom wifi on mid-2010s MacBooks**
    - https://github.com/basecamp/omarchy/pull/1143
    - Especially relevant discussion:
-     - users with `14e4:43ba` reported that the feature-disable flag alone was
-       not sufficient
-     - one contributor reported better results with `broadcom-wl-dkms` plus a
-       BCM43602-specific blacklist file
+      - the PR explicitly targeted `14e4:43a0` and `14e4:43ba`
+      - the proposed fix path was the kernel parameter
+        `brcmfmac.feature_disable=0x82000`
 
 4. Omarchy pull request **Add modifications to support Offline ISO**
    - https://github.com/basecamp/omarchy/pull/1621
    - Why it matters:
-     - this PR included Broadcom/Mac-related installer handling
-     - the review discussion referenced placing Apple Broadcom fixes in Omarchy
-       hardware scripts
+      - it included Apple/Broadcom installer handling in Omarchy itself
+      - it is another sign that the MacBook Broadcom path is hardware-specific
+        enough to deserve dedicated setup logic
 
 ### Additional issue threads with matching failure signatures
 
@@ -222,9 +224,11 @@ journalctl -k -b --no-pager | grep -Ei 'wl|brcm|cfg80211'
 
 ## Notes for future updates
 
-- If the DKMS-based `wl` path works, update this document with the post-reboot
-  verification output.
-- If it still fails, the next escalation path is likely one of:
-  - testing a different kernel version with `wl`
+- If the `brcmfmac.feature_disable=0x82000` path works, update this document
+  with the exact kernel parameter location and post-reboot verification output.
+- If `wl` is tried again later, record the exact privileged `journalctl` output
+  for that boot rather than relying on older logs.
+- If both paths still fail, the next escalation path is likely one of:
+  - testing a different kernel version
   - testing a patched Apple-specific Broadcom STA tree
-  - reconsidering the `brcmfmac` path despite the preference for `wl`
+  - collecting fuller upstream issue data before making more local changes

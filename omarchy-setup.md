@@ -41,9 +41,9 @@ This document tracks the current Omarchy setup on this machine.
 
 - Adapter: `Broadcom BCM43602 802.11ac Wireless LAN SoC`
 - PCI ID: `14e4:43ba`
-- Active driver: `brcmfmac`
+- Active driver: none currently bound cleanly for Wi-Fi use
 - Installed modules available: `brcmfmac`, `wl`
-- Interface: `wlan0`
+- Interface: none visible in `iw dev`
 
 ### Main config locations
 
@@ -139,23 +139,34 @@ This machine currently reports:
 - Memory: `15 GiB`
 - Wireless adapter: `Broadcom BCM43602`
 
-### 5. Install the Broadcom proprietary package
+### 5. Test the Broadcom proprietary package path
 
-If the `wl` package is needed on this system, install it with:
+If the proprietary `wl` path is being tested on this system, use the repo
+helper instead of manually installing the non-DKMS package:
 
 ```bash
-sudo pacman -S --needed broadcom-wl
+sudo ./repair-broadcom-wl.sh
 ```
 
-Then verify that the package is installed:
+That helper:
+
+- removes `broadcom-wl` if it is present
+- installs `broadcom-wl-dkms`, `dkms`, and `linux-headers`
+- writes `/etc/modprobe.d/broadcom-wl-bcm43602.conf`
+- refreshes module dependencies
+- rebuilds initramfs
+- attempts a live `wl` reload, but still expects a reboot afterward
+
+Then verify the resulting package state:
 
 ```bash
-pacman -Q broadcom-wl
+pacman -Q broadcom-wl-dkms dkms linux-headers
+dkms status
 ```
 
 At the time of writing, the installed package is:
 
-- `broadcom-wl 6.30.223.271-679`
+- `broadcom-wl-dkms 6.30.223.271-47`
 
 ### 6. Verify the active wireless driver
 
@@ -170,34 +181,48 @@ iw dev
 Current verified state on this machine:
 
 - Adapter: `Broadcom BCM43602 802.11ac Wireless LAN SoC`
-- Interface: `wlan0`
-- Active driver: `brcmfmac`
-- Installed modules visible: `brcmfmac`, `wl`
+- Interface: none
+- `iw dev` is empty
+- `wl` is loaded
+- `cfg80211` is loaded
+- `lspci -k -s 02:00.0` does not currently show a working Wi-Fi driver in use
 
 ### 7. Recover the proprietary `wl` driver
 
 If `broadcom-wl` is installed but `wl` still fails to initialize on this
 machine, the repo includes a helper script that switches to the DKMS-backed
-package and rewrites the BCM43602 blacklist file:
+package, rewrites the BCM43602 blacklist file, and rebuilds initramfs:
 
 ```bash
 sudo ./repair-broadcom-wl.sh
 ```
 
-What the script does:
-
-- removes the stock `broadcom-wl` package if present
-- installs `broadcom-wl-dkms`, `dkms`, and `linux-headers`
-- writes `/etc/modprobe.d/broadcom-wl-bcm43602.conf`
-- refreshes module dependencies
-- attempts a live `wl` reload, but still expects a reboot afterward
-
 After running it, reboot and then verify:
+
+```bash
+lspci -k -s 02:00.0
+pacman -Q broadcom-wl-dkms dkms linux-headers
+dkms status
+iw dev
+nmcli device status
+sudo journalctl -k -b --no-pager | grep -Ei 'wl|brcm|cfg80211|firmware'
+```
+
+If `iw dev` is still empty and `lspci -k` still does not show
+`Kernel driver in use: wl`, do not assume another `wl` reinstall will fix it.
+For `14e4:43ba`, the next likely path is the ArchWiki/Omarchy one:
+
+```bash
+brcmfmac.feature_disable=0x82000
+```
+
+Before switching drivers, capture the failed `wl` boot evidence with:
 
 ```bash
 lspci -k -s 02:00.0
 iw dev
 nmcli device status
+sudo journalctl -k -b --no-pager | grep -Ei 'wl|brcm|cfg80211|firmware'
 ```
 
 ### 8. Update the repo docs safely
@@ -215,8 +240,8 @@ This machine is running the Omarchy distro on Apple hardware, so display, power,
 keyboard, and desktop behavior may include Apple-specific integrations exposed
 through Omarchy commands and Hyprland configuration.
 
-The proprietary Broadcom `wl` package is installed, but the system is currently
-still using `brcmfmac` as the active kernel driver.
+The DKMS-backed Broadcom `wl` package is installed, but the system still does
+not expose a working Wi-Fi interface from the internal BCM43602.
 
 The exact original Omarchy installation date is not recorded here yet; this
 document reflects the verified setup state documented on `2026-03-15`.
