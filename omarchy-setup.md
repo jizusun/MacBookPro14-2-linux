@@ -174,7 +174,33 @@ Current verified state on this machine:
 - Active driver: `brcmfmac`
 - Installed modules visible: `brcmfmac`, `wl`
 
-### 7. Update the repo docs safely
+### 7. Recover the proprietary `wl` driver
+
+If `broadcom-wl` is installed but `wl` still fails to initialize on this
+machine, the repo includes a helper script that switches to the DKMS-backed
+package and rewrites the BCM43602 blacklist file:
+
+```bash
+sudo ./repair-broadcom-wl.sh
+```
+
+What the script does:
+
+- removes the stock `broadcom-wl` package if present
+- installs `broadcom-wl-dkms`, `dkms`, and `linux-headers`
+- writes `/etc/modprobe.d/broadcom-wl-bcm43602.conf`
+- refreshes module dependencies
+- attempts a live `wl` reload, but still expects a reboot afterward
+
+After running it, reboot and then verify:
+
+```bash
+lspci -k -s 02:00.0
+iw dev
+nmcli device status
+```
+
+### 8. Update the repo docs safely
 
 When updating this repo:
 

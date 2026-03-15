@@ -19,3 +19,12 @@ This repository is for my `MacBookPro14,2` running Omarchy.
 ## Purpose
 
 This repo is a simple place to keep notes, configuration, and machine-specific setup related to this MacBook running Omarchy.
+
+## Documents
+
+- [`omarchy-setup.md`](./omarchy-setup.md) — current Omarchy, hardware, and wireless setup notes for this machine
+- [`broadcom-wl-investigation.md`](./broadcom-wl-investigation.md) — investigation log for the BCM43602 proprietary `wl` driver failure
+
+## Scripts
+
+- [`repair-broadcom-wl.sh`](./repair-broadcom-wl.sh) — root-runnable helper to switch from `broadcom-wl` to `broadcom-wl-dkms` and refresh BCM43602 `wl` settings
