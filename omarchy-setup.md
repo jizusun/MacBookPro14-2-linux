@@ -142,7 +142,7 @@ This machine currently reports:
 ### 5. Test the Broadcom proprietary package path
 
 If the proprietary `wl` path is being tested on this system, use the repo
-helper instead of manually installing the non-DKMS package:
+helper instead of manually reproducing the Omarchy package commands:
 
 ```bash
 sudo ./repair-broadcom-wl.sh
@@ -150,8 +150,8 @@ sudo ./repair-broadcom-wl.sh
 
 That helper:
 
-- removes `broadcom-wl` if it is present
-- installs `broadcom-wl-dkms`, `dkms`, and `linux-headers`
+- removes `broadcom-wl-dkms` if it is present
+- installs `broadcom-wl`, `dkms`, and `linux-headers`
 - writes `/etc/modprobe.d/broadcom-wl-bcm43602.conf`
 - refreshes module dependencies
 - rebuilds initramfs
@@ -160,13 +160,14 @@ That helper:
 Then verify the resulting package state:
 
 ```bash
-pacman -Q broadcom-wl-dkms dkms linux-headers
-dkms status
+pacman -Q broadcom-wl dkms linux-headers
 ```
 
-At the time of writing, the installed package is:
+This mirrors Omarchy's current `fix-bcm43xx.sh` installer path, adapted here
+for the local BCM43602 machine-specific helper.
 
-- `broadcom-wl-dkms 6.30.223.271-47`
+The local helper also mirrors Omarchy's `lspci -nnv` detection style, but adds
+an explicit match for this machine's `14e4:43ba` PCI ID.
 
 ### 6. Verify the active wireless driver
 
@@ -190,8 +191,9 @@ Current verified state on this machine:
 ### 7. Recover the proprietary `wl` driver
 
 If `broadcom-wl` is installed but `wl` still fails to initialize on this
-machine, the repo includes a helper script that switches to the DKMS-backed
-package, rewrites the BCM43602 blacklist file, and rebuilds initramfs:
+machine, the repo includes a helper script that aligns the package selection
+with Omarchy's current Broadcom fix, rewrites the BCM43602 blacklist file, and
+rebuilds initramfs:
 
 ```bash
 sudo ./repair-broadcom-wl.sh
@@ -201,8 +203,7 @@ After running it, reboot and then verify:
 
 ```bash
 lspci -k -s 02:00.0
-pacman -Q broadcom-wl-dkms dkms linux-headers
-dkms status
+pacman -Q broadcom-wl dkms linux-headers
 iw dev
 nmcli device status
 sudo journalctl -k -b --no-pager | grep -Ei 'wl|brcm|cfg80211|firmware'
@@ -210,19 +211,32 @@ sudo journalctl -k -b --no-pager | grep -Ei 'wl|brcm|cfg80211|firmware'
 
 If `iw dev` is still empty and `lspci -k` still does not show
 `Kernel driver in use: wl`, do not assume another `wl` reinstall will fix it.
-For `14e4:43ba`, the next likely path is the ArchWiki/Omarchy one:
+For this repo, keep the machine on the proprietary `wl` path and re-check the
+package and live device state:
 
 ```bash
-brcmfmac.feature_disable=0x82000
+sudo ./repair-broadcom-wl.sh
+pacman -Q broadcom-wl dkms linux-headers
 ```
 
-Before switching drivers, capture the failed `wl` boot evidence with:
+Before changing any other part of the stack, capture the failed `wl` boot
+evidence with:
 
 ```bash
 lspci -k -s 02:00.0
 iw dev
 nmcli device status
 sudo journalctl -k -b --no-pager | grep -Ei 'wl|brcm|cfg80211|firmware'
+```
+
+If `wl` later exposes an interface but association still fails while using
+`iwd`, test the NetworkManager path instead:
+
+```bash
+sudo pacman -S --needed networkmanager
+sudo systemctl disable --now iwd
+sudo systemctl enable --now NetworkManager.service
+nmcli device status
 ```
 
 ### 8. Update the repo docs safely

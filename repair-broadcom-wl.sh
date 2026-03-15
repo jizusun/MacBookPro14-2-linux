@@ -37,9 +37,16 @@ require_commands() {
 }
 
 check_hardware() {
-  if ! lspci -nn | grep -qi "${BCM_PCI_ID}"; then
-    fail "This script is intended for the BCM43602 (${BCM_PCI_ID}) in this repo."
+  local pci_info
+  pci_info="$(lspci -nnv)"
+
+  # Mirror Omarchy's lspci-based Broadcom detection, extended for BCM43602.
+  if echo "${pci_info}" | grep -q "${BCM_PCI_ID}"; then
+    log "BCM43602 detected (${BCM_PCI_ID})"
+    return
   fi
+
+  fail "This script is intended for the BCM43602 (${BCM_PCI_ID}) in this repo."
 }
 
 backup_existing_config() {
@@ -51,19 +58,15 @@ backup_existing_config() {
 }
 
 replace_package() {
-  if pacman -Q broadcom-wl >/dev/null 2>&1; then
-    log "Removing stock broadcom-wl package"
-    pacman -R --noconfirm broadcom-wl
-  else
-    log "Stock broadcom-wl package is not installed"
-  fi
-
   if pacman -Q broadcom-wl-dkms >/dev/null 2>&1; then
-    log "broadcom-wl-dkms is already installed"
+    log "Removing broadcom-wl-dkms to align with Omarchy's current Broadcom fix"
+    pacman -R --noconfirm broadcom-wl-dkms
+  else
+    log "broadcom-wl-dkms is not installed"
   fi
 
-  log "Installing broadcom-wl-dkms, dkms, and linux-headers"
-  pacman -S --needed --noconfirm broadcom-wl-dkms dkms linux-headers
+  log "Installing broadcom-wl, dkms, and linux-headers"
+  pacman -S --needed --noconfirm broadcom-wl dkms linux-headers
 }
 
 write_blacklist_file() {
@@ -126,30 +129,37 @@ print_summary() {
 
 Done.
 
-This script gets the system onto the Arch DKMS-backed `wl` setup, writes the
-Broadcom blacklist policy, refreshes module metadata, and rebuilds the
-initramfs for the next boot. That cleanup is useful, but it is not a guarantee
-that BCM43602 will successfully initialize with `wl` on the current kernel.
+This script aligns the machine with Omarchy's current Broadcom package path,
+keeps the BCM43602 `wl` blacklist policy in place, refreshes module metadata,
+and rebuilds the initramfs for the next boot. That cleanup is useful, but it is
+not a guarantee that BCM43602 will successfully initialize with `wl` on the
+current kernel.
 
 Next steps:
 1. Reboot the machine.
-2. After reboot, verify package and DKMS state:
-     pacman -Q broadcom-wl-dkms dkms linux-headers
-     dkms status
+2. After reboot, verify the Omarchy-style Broadcom package state:
+     pacman -Q broadcom-wl dkms linux-headers
 3. Verify whether the Broadcom card is actually using wl:
      lspci -k -s 02:00.0
 4. Check for a wireless interface:
      iw dev
-5. Check NetworkManager or iwd device status:
-     nmcli device status
+5. Check Omarchy's default wireless stack:
+     systemctl status iwd.service --no-pager
+     iwctl device list
 
 If `iw dev` is still empty or `lspci -k` still does not show
 `Kernel driver in use: wl`, capture:
   sudo journalctl -k -b --no-pager | grep -Ei 'wl|brcm|cfg80211|firmware'
 
-If that still shows `wl` failing, the next likely path for BCM43602 (`14e4:43ba`)
-is to stop iterating the `wl` reinstall path and test the ArchWiki fallback:
-  brcmfmac.feature_disable=0x82000
+If that still shows `wl` failing, stay on the Omarchy-style `wl` path in this
+repo and verify the userspace network stack before changing anything else:
+  sudo pacman -S --needed networkmanager
+  sudo systemctl disable --now iwd
+  sudo systemctl enable --now NetworkManager.service
+
+Then re-check:
+  nmcli device status
+  iw dev
 EOF
 }
 

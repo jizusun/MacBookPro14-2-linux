@@ -28,4 +28,4 @@ This repo is a simple place to keep notes, configuration, and machine-specific s
 
 ## Scripts
 
-- [`repair-broadcom-wl.sh`](./repair-broadcom-wl.sh) — root-runnable helper to switch from `broadcom-wl` to `broadcom-wl-dkms` and refresh BCM43602 `wl` settings
+- [`repair-broadcom-wl.sh`](./repair-broadcom-wl.sh) — root-runnable helper to align BCM43602 with Omarchy's current `broadcom-wl` package path, using Omarchy-style `lspci` detection extended for `14e4:43ba`

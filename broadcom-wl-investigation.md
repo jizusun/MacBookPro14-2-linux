@@ -128,8 +128,9 @@ cleanup step, but it was not sufficient. Based on the collected evidence, the
 most practical next step is now:
 
 1. capture privileged post-reboot kernel logs for the current failed boot
-2. if `wl` still is not binding cleanly, stop iterating the `wl` reinstall path
-3. test the ArchWiki BCM43602 fallback with `brcmfmac.feature_disable=0x82000`
+2. align the local helper with Omarchy's current `broadcom-wl` installer path
+3. if `wl` later exposes an interface but association still fails, test
+   `NetworkManager` instead of `iwd` before changing driver families
 
 This is why the repo now includes:
 
@@ -137,9 +138,12 @@ This is why the repo now includes:
 sudo ./repair-broadcom-wl.sh
 ```
 
-The helper script is still useful for getting onto the Arch DKMS-backed `wl`
-setup and rebuilding initramfs cleanly, but it should now be treated as cleanup
-and verification support, not as a complete fix by itself.
+The helper script now mirrors Omarchy's current Broadcom package selection for
+the proprietary `wl` path while still keeping the BCM43602-specific blacklist
+policy local to this repo. Its hardware probe also follows Omarchy's
+`lspci -nnv` detection style, extended here with an explicit `14e4:43ba`
+match. It should be treated as cleanup and verification support, not as a
+complete fix by itself.
 
 ## Recommended next steps
 
@@ -153,11 +157,23 @@ nmcli device status
 ```
 
 If `iw dev` is still empty and `lspci -k` still does not show
-`Kernel driver in use: wl`, the next path worth testing is the ArchWiki one for
-`14e4:43ba`:
+`Kernel driver in use: wl`, stay on the repo's `wl` path and re-check the
+package and userspace network state:
 
 ```bash
-brcmfmac.feature_disable=0x82000
+sudo ./repair-broadcom-wl.sh
+pacman -Q broadcom-wl dkms linux-headers
+```
+
+If `wl` eventually creates an interface but association still fails while using
+`iwd`, test the NetworkManager path that upstream Omarchy users reported
+improved behavior with:
+
+```bash
+sudo pacman -S --needed networkmanager
+sudo systemctl disable --now iwd
+sudo systemctl enable --now NetworkManager.service
+nmcli device status
 ```
 
 ## Detailed references
@@ -224,11 +240,9 @@ brcmfmac.feature_disable=0x82000
 
 ## Notes for future updates
 
-- If the `brcmfmac.feature_disable=0x82000` path works, update this document
-  with the exact kernel parameter location and post-reboot verification output.
 - If `wl` is tried again later, record the exact privileged `journalctl` output
   for that boot rather than relying on older logs.
-- If both paths still fail, the next escalation path is likely one of:
+- If `wl` still fails, the next escalation path is likely one of:
   - testing a different kernel version
   - testing a patched Apple-specific Broadcom STA tree
   - collecting fuller upstream issue data before making more local changes
