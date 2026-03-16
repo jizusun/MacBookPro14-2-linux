@@ -142,45 +142,39 @@ This machine currently reports:
 ### 5. Test available wireless solutions
 
 For a full list of known solutions for the BCM43602 (`14e4:43ba`) adapter
-— including the `wireless-regdb` regulatory domain fix, the `brcmfmac`
-kernel parameter, the proprietary `wl` path, and the txpower workaround —
-see:
+The recommended approach for this machine is to use the open-source `brcmfmac`
+driver with the `brcmfmac.feature_disable=0x82000` kernel parameter
+(Solution 1 in `wireless-solutions.md`). This is the confirmed fix for
+BCM43602 on Omarchy (issue #4611, discussion #4692).
+
+The proprietary `wl` driver is **broken on kernel 6.19+** and has never been
+confirmed working for `14e4:43ba` in the omarchy community. See
+`wireless-solutions.md` (Appendix A) for the full analysis.
+
+To switch to `brcmfmac`:
+
+```bash
+sudo ./switch-to-brcmfmac.sh
+```
+
+Then reboot and verify:
+
+```bash
+lsmod | grep brcmfmac        # driver loaded
+iw dev                        # wireless interface present
+nmcli device wifi list        # nearby networks visible
+```
+
+If no networks appear, set the regulatory domain (Solution 2):
+
+```bash
+sudo pacman -S --needed wireless-regdb
+sudo iw reg set CN            # use your country code
+```
+
+For full details on all available solutions, see:
 
 - [`wireless-solutions.md`](./wireless-solutions.md)
-
-The recommended starting order for this machine is:
-1. `wireless-regdb` + `iw reg set <COUNTRY>` (Solution 2 in that doc)
-2. `brcmfmac.feature_disable=0x82000` kernel parameter (Solution 1)
-3. `broadcom-wl` + NetworkManager (Solution 3) — currently blocked by a
-   `wl` kernel initialization failure on kernel `6.19.6-arch1-1`
-
-If the proprietary `wl` path is being tested on this system, use the repo
-helper instead of manually reproducing the Omarchy package commands:
-
-```bash
-sudo ./repair-broadcom-wl.sh
-```
-
-That helper:
-
-- removes `broadcom-wl-dkms` if it is present
-- installs `broadcom-wl`, `dkms`, and `linux-headers`
-- writes `/etc/modprobe.d/broadcom-wl-bcm43602.conf`
-- refreshes module dependencies
-- rebuilds initramfs
-- attempts a live `wl` reload, but still expects a reboot afterward
-
-Then verify the resulting package state:
-
-```bash
-pacman -Q broadcom-wl dkms linux-headers
-```
-
-This mirrors Omarchy's current `fix-bcm43xx.sh` installer path, adapted here
-for the local BCM43602 machine-specific helper.
-
-The local helper also mirrors Omarchy's `lspci -nnv` detection style, but adds
-an explicit match for this machine's `14e4:43ba` PCI ID.
 
 ### 6. Verify the active wireless driver
 
@@ -188,68 +182,8 @@ Check both the driver bound to the device and the loaded modules:
 
 ```bash
 lspci -nnk | grep -A4 -Ei 'network|wireless|broadcom'
-lsmod | grep -E '^wl\\b|^brcmfmac|^bcma|^ssb\\b|^brcmsmac'
+lsmod | grep -E '^wl\b|^brcmfmac|^bcma|^ssb\b|^brcmsmac'
 iw dev
-```
-
-Current verified state on this machine:
-
-- Adapter: `Broadcom BCM43602 802.11ac Wireless LAN SoC`
-- Interface: none
-- `iw dev` is empty
-- `wl` is loaded
-- `cfg80211` is loaded
-- `lspci -k -s 02:00.0` does not currently show a working Wi-Fi driver in use
-
-### 7. Recover the proprietary `wl` driver
-
-If `broadcom-wl` is installed but `wl` still fails to initialize on this
-machine, the repo includes a helper script that aligns the package selection
-with Omarchy's current Broadcom fix, rewrites the BCM43602 blacklist file, and
-rebuilds initramfs:
-
-```bash
-sudo ./repair-broadcom-wl.sh
-```
-
-After running it, reboot and then verify:
-
-```bash
-lspci -k -s 02:00.0
-pacman -Q broadcom-wl dkms linux-headers
-iw dev
-nmcli device status
-sudo journalctl -k -b --no-pager | grep -Ei 'wl|brcm|cfg80211|firmware'
-```
-
-If `iw dev` is still empty and `lspci -k` still does not show
-`Kernel driver in use: wl`, do not assume another `wl` reinstall will fix it.
-For this repo, keep the machine on the proprietary `wl` path and re-check the
-package and live device state:
-
-```bash
-sudo ./repair-broadcom-wl.sh
-pacman -Q broadcom-wl dkms linux-headers
-```
-
-Before changing any other part of the stack, capture the failed `wl` boot
-evidence with:
-
-```bash
-lspci -k -s 02:00.0
-iw dev
-nmcli device status
-sudo journalctl -k -b --no-pager | grep -Ei 'wl|brcm|cfg80211|firmware'
-```
-
-If `wl` later exposes an interface but association still fails while using
-`iwd`, test the NetworkManager path instead:
-
-```bash
-sudo pacman -S --needed networkmanager
-sudo systemctl disable --now iwd
-sudo systemctl enable --now NetworkManager.service
-nmcli device status
 ```
 
 ### 8. Update the repo docs safely
@@ -267,8 +201,6 @@ This machine is running the Omarchy distro on Apple hardware, so display, power,
 keyboard, and desktop behavior may include Apple-specific integrations exposed
 through Omarchy commands and Hyprland configuration.
 
-The DKMS-backed Broadcom `wl` package is installed, but the system still does
-not expose a working Wi-Fi interface from the internal BCM43602.
-
 The exact original Omarchy installation date is not recorded here yet; this
-document reflects the verified setup state documented on `2026-03-15`.
+document reflects the verified setup state documented on `2026-03-15`, updated
+`2026-03-16` to switch from the proprietary `wl` path to `brcmfmac`.

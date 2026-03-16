@@ -23,10 +23,9 @@ This repo is a simple place to keep notes, configuration, and machine-specific s
 ## Documents
 
 - [`omarchy-setup.md`](./omarchy-setup.md) — current Omarchy, hardware, and wireless setup notes for this machine
-- [`wireless-solutions.md`](./wireless-solutions.md) — all known solutions for the BCM43602 (`14e4:43ba`) wireless adapter, with weights, tradeoffs, and step-by-step instructions
-- [`broadcom-wl-investigation.md`](./broadcom-wl-investigation.md) — investigation log for the BCM43602 proprietary `wl` driver failure
+- [`wireless-solutions.md`](./wireless-solutions.md) — all known solutions for the BCM43602 (`14e4:43ba`) wireless adapter, with weights, tradeoffs, step-by-step instructions, and the `wl` driver investigation log
 - [`mihomo-setup.md`](./mihomo-setup.md) — notes on the user-local `mihomo` proxy installation and verification
 
 ## Scripts
 
-- [`repair-broadcom-wl.sh`](./repair-broadcom-wl.sh) — root-runnable helper to align BCM43602 with Omarchy's current `broadcom-wl` package path, using Omarchy-style `lspci` detection extended for `14e4:43ba`
+- [`switch-to-brcmfmac.sh`](./switch-to-brcmfmac.sh) — switches from the proprietary `wl` driver to the open-source `brcmfmac` driver for BCM43602 (`14e4:43ba`); supports `--undo` to reverse
