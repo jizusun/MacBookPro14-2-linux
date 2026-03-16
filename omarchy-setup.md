@@ -186,7 +186,93 @@ lsmod | grep -E '^wl\b|^brcmfmac|^bcma|^ssb\b|^brcmsmac'
 iw dev
 ```
 
-### 8. Update the repo docs safely
+### 7. Fix the escape key (Touch Bar / applespi)
+
+The MacBookPro14,2 Touch Bar keyboard is connected over SPI.  Without the
+`applespi` driver loaded, the Touch Bar is silent — including the physical Esc key.
+
+The Omarchy installer handles this via `fix-apple-spi-keyboard.sh` for all
+`MacBookPro14,[123]` models.  To apply manually:
+
+```bash
+# 1. Install the out-of-tree SPI keyboard driver (AUR)
+yay -S macbook12-spi-driver-dkms
+
+# 2. Add the required modules to the initramfs
+echo 'MODULES=(applespi intel_lpss_pci spi_pxa2xx_platform)' \
+  | sudo tee /etc/mkinitcpio.conf.d/macbook_spi_modules.conf
+
+# 3. Rebuild initramfs and reboot
+sudo mkinitcpio -P
+sudo reboot
+```
+
+After reboot, verify the module is loaded:
+
+```bash
+lsmod | grep applespi      # should appear
+```
+
+The Touch Bar will still not display its context-sensitive UI (that requires
+a separate T1/T2 driver stack not available for this model), but the Esc key
+and all Touch Bar function-key areas will emit standard HID key events.
+
+**References:**
+- Omarchy `fix-apple-spi-keyboard.sh` —
+  https://github.com/basecamp/omarchy/blob/dev/install/config/hardware/fix-apple-spi-keyboard.sh
+
+---
+
+### 8. Fix USB tethering re-connect
+
+When a USB-tethered device (phone in USB tethering mode, or a USB ethernet
+adapter) is unplugged and replugged, it may not be re-recognised by
+NetworkManager.  The root cause is Linux USB autosuspend — the kernel powers
+the USB port down between plug events, and the device re-enumeration can fail.
+
+The Omarchy installer applies this fix globally via `usb-autosuspend.sh`.
+To apply manually:
+
+```bash
+# Disable USB autosuspend for all devices
+echo 'options usbcore autosuspend=-1' \
+  | sudo tee /etc/modprobe.d/disable-usb-autosuspend.conf
+
+# Rebuild initramfs so the option is present from early boot
+sudo mkinitcpio -P
+
+sudo reboot
+```
+
+After reboot, replugging the adapter should cause it to be enumerated
+immediately and NetworkManager will create a new connection profile
+(or reuse an existing one with `autoconnect=yes`).
+
+**Verify:**
+
+```bash
+lsusb                          # adapter appears after replug
+nmcli device status            # new ethernet/usb device visible
+```
+
+**References:**
+- Omarchy `usb-autosuspend.sh` —
+  https://github.com/basecamp/omarchy/blob/dev/install/config/hardware/usb-autosuspend.sh
+
+---
+
+### 9. Fix lid-close wake failure and battery drain
+
+See [`sleep-lid-solutions.md`](./sleep-lid-solutions.md) for the full walkthrough.
+
+**TL;DR:** add `mem_sleep_default=s2idle` to the kernel cmdline, set
+`HandleLidSwitch=sleep` in logind, and disable NVMe D3-cold with a systemd
+service.  This switches the machine from broken `deep` S3 sleep to `s2idle`
+(suspend-to-idle), which wakes reliably and drains far less battery.
+
+---
+
+### 10. Update the repo docs safely
 
 When updating this repo:
 
