@@ -25,6 +25,7 @@ This repo is a simple place to keep notes, configuration, and machine-specific s
 - [`omarchy-setup.md`](./omarchy-setup.md) — current Omarchy, hardware, and wireless setup notes for this machine
 - [`wireless-solutions.md`](./wireless-solutions.md) — all known solutions for the BCM43602 (`14e4:43ba`) wireless adapter, with weights, tradeoffs, step-by-step instructions, and the `wl` driver investigation log
 - [`mihomo-setup.md`](./mihomo-setup.md) — notes on the user-local `mihomo` proxy installation and verification
+- [`sleep-lid-solutions.md`](./sleep-lid-solutions.md) — fix for lid-close wake failure and excessive battery drain (`s2idle` + NVMe d3cold)
 
 ## Scripts
 
