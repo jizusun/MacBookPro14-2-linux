@@ -241,3 +241,74 @@ speaker-test -c 2 -t wav -l 1
 
 - Must be rebuilt after every kernel update
 - Reference: [roadrunner2's gist](https://gist.github.com/roadrunner2/1289542a748d9a104e7baec6a92f9cd7) and [gist comments (Jan 2026)](https://gist.github.com/roadrunner2/1289542a748d9a104e7baec6a92f9cd7?permalink_comment_id=5949932#gistcomment-5949932)
+
+## Fix 7: Power Management
+
+Linux lacks macOS's firmware-level power tuning. These tools close the gap.
+
+### 7a. TLP
+
+```bash
+sudo pacman -S tlp tlp-rdw
+sudo systemctl enable --now tlp
+sudo systemctl enable --now NetworkManager-dispatcher
+sudo systemctl mask systemd-rfkill.service systemd-rfkill.socket
+```
+
+Config: `/etc/tlp.conf`
+
+### 7b. Powertop auto-tune on boot
+
+```bash
+sudo pacman -S powertop
+sudo tee /etc/systemd/system/powertop.service <<'EOF'
+[Unit]
+Description=Powertop auto-tune
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/powertop --auto-tune
+[Install]
+WantedBy=multi-user.target
+EOF
+sudo systemctl enable powertop
+```
+
+### 7c. thermald
+
+```bash
+sudo pacman -S thermald
+sudo systemctl enable --now thermald
+```
+
+### 7d. PCIe ASPM powersupersave
+
+Added `pcie_aspm.policy=powersupersave` to kernel cmdline in `/boot/limine.conf`. Requires reboot.
+
+### 7e. Audio power save
+
+```bash
+echo 'options snd_hda_intel power_save=1' | sudo tee /etc/modprobe.d/audio_powersave.conf
+```
+
+### Verify
+
+```bash
+# Check TLP status
+sudo tlp-stat -s
+
+# Monitor per-component power draw
+sudo powertop
+
+# Confirm ASPM policy (after reboot)
+cat /sys/module/pcie_aspm/parameters/policy
+# Expected: default performance [powersupersave]
+```
+
+### Useful commands
+
+| Command | Purpose |
+|---|---|
+| `sudo powertop` | Monitor power usage per component |
+| `sudo tlp-stat -s` | TLP status overview |
+| `sudo tlp-stat -b` | Battery health & charge info |
+| `rfkill block bluetooth` | Disable Bluetooth to save power |
