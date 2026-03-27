@@ -11,10 +11,17 @@ This repository is for my `MacBookPro14,2` running Omarchy.
 
 ## Current system snapshot
 
-- Distribution: `Omarchy`
-- Kernel: `6.19.6-arch1-1`
-- CPU: `Intel Core i7-7567U`
+- Distribution: `CachyOS`
+- Kernel: `6.19.10-1-cachyos` (LTS: `6.18.20-1-cachyos-lts`)
+- Bootloader: `Limine`
+- Compositor: `niri 25.11`
+- Display manager: `SDDM`
+- CPU: `Intel Core i7-7567U (Kaby Lake)`
+- GPU: `Intel Iris Plus Graphics 650 (i915)`
 - Memory: `15 GiB`
+- Storage: `Apple SSD AP0512J (NVMe)`
+- Wi-Fi: `BCM43602 (14e4:43ba)`
+- Thunderbolt: `Intel JHL6540 Alpine Ridge 4C (×2, blacklisted)`
 
 ## Purpose
 
@@ -25,6 +32,7 @@ This repo is a simple place to keep notes, configuration, and machine-specific s
 - [`omarchy-setup.md`](./omarchy-setup.md) — current Omarchy, hardware, and wireless setup notes for this machine
 - [`wireless-solutions.md`](./wireless-solutions.md) — all known solutions for the BCM43602 (`14e4:43ba`) wireless adapter, with weights, tradeoffs, step-by-step instructions, and the `wl` driver investigation log
 - [`mihomo-setup.md`](./mihomo-setup.md) — notes on the user-local `mihomo` proxy installation and verification
+- [`suspend-resume-fix.md`](./suspend-resume-fix.md) — fixes for system freeze and slow resume after lid close/open (Apple NVMe D3 Cold + Thunderbolt timeout)
 
 ## Scripts
 
