@@ -174,3 +174,70 @@ sudo dmesg | grep -i "apple-ibridge\|apple_ib"
 
 - Modules must be rebuilt after each kernel update (`make CC=clang LD=ld.lld`)
 - Reference: [roadrunner2's gist](https://gist.github.com/roadrunner2/1289542a748d9a104e7baec6a92f9cd7) and [Drayux's comment](https://gist.github.com/roadrunner2/1289542a748d9a104e7baec6a92f9cd7?permalink_comment_id=4937505#gistcomment-4937505)
+
+## Fix 5: Libinput Touchpad/Keyboard/Touchbar Quirks
+
+Touchpad DPI, touch size, palm rejection thresholds, and keyboard/touchbar integration flags are not set by default for the Apple SPI devices.
+
+### Apply
+
+```bash
+sudo mkdir -p /etc/libinput
+sudo tee /etc/libinput/local-overrides.quirks << 'EOF'
+[MacBook(Pro) SPI Touchpads]
+MatchName=*Apple SPI Touchpad*
+ModelAppleTouchpad=1
+AttrTouchSizeRange=200:150
+AttrPalmSizeThreshold=1100
+
+[MacBook(Pro) SPI Keyboards]
+MatchName=*Apple SPI Keyboard*
+AttrKeyboardIntegration=internal
+
+[MacBookPro Touchbar]
+MatchBus=usb
+MatchVendor=0x05AC
+MatchProduct=0x8600
+AttrKeyboardIntegration=internal
+EOF
+```
+
+Reboot or re-login to apply.
+
+## Fix 6: Audio (Cirrus Logic CS8409)
+
+The upstream `snd-hda-codec-cs8409` driver detects the codec but produces no sound on MacBook Pros. The [davidjo/snd_hda_macbookpro](https://github.com/davidjo/snd_hda_macbookpro) out-of-tree driver is needed.
+
+Since CachyOS kernels are built with clang, the install script must use `LLVM=1`.
+
+### Apply
+
+```bash
+git clone https://github.com/davidjo/snd_hda_macbookpro.git
+cd snd_hda_macbookpro
+
+# Patch install script for LLVM/clang-built kernels
+sed -i 's/^\t\tmake \(PATCH_CIRRUS=1\)$/\t\tmake LLVM=1 \1/' install.cirrus.driver.sh
+sed -i 's/^\t\tmake install \(PATCH_CIRRUS=1\)$/\t\tmake LLVM=1 install \1/' install.cirrus.driver.sh
+sed -i 's/^\t\tmake \(KERNELRELEASE=\$UNAME\)$/\t\tmake LLVM=1 \1/' install.cirrus.driver.sh
+sed -i 's/^\t\tmake install \(KERNELRELEASE=\$UNAME\)$/\t\tmake LLVM=1 install \1/' install.cirrus.driver.sh
+
+sudo ./install.cirrus.driver.sh
+sudo reboot
+```
+
+### Verify
+
+```bash
+# After reboot, confirm patched module is loaded from updates/
+modinfo snd-hda-codec-cs8409 | head -2
+# filename should contain /updates/
+
+# Test audio
+speaker-test -c 2 -t wav -l 1
+```
+
+### Notes
+
+- Must be rebuilt after every kernel update
+- Reference: [roadrunner2's gist](https://gist.github.com/roadrunner2/1289542a748d9a104e7baec6a92f9cd7) and [gist comments (Jan 2026)](https://gist.github.com/roadrunner2/1289542a748d9a104e7baec6a92f9cd7?permalink_comment_id=5949932#gistcomment-5949932)
